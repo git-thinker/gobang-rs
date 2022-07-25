@@ -1,10 +1,18 @@
 # gobang-rs
 
-this is a command-line gobang game on a 10-by-10 board with Rust.
+This is a command-line gobang game on a 10-by-10 board with Rust.
 
-it is my first tui-rs app and also my very first Rust project.
+It is my first tui-rs app and also my very first Rust project.
 
-Known bugs:
+Develop with:
+
++ Rust
+
++ tui-rs
+
++ crossterm
+
+### Known bugs:
 
 + cell size does not change with window size
 
