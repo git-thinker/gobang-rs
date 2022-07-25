@@ -21,7 +21,7 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     // 初始化 app 资源
-    let mut app = App::App::new();
+    let app = App::App::new();
  	// 程序主要逻辑循环 …… //
     App::run_app(&mut terminal, app)?;
     // 恢复 Terminal
