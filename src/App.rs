@@ -1,20 +1,19 @@
-use std::{io, time::Duration, fmt::Display};
+// app info and app operation 
 
-use crossterm::{event::{self, Event, KeyCode}};
-use tui::{
-    backend::Backend,
-    layout::{Constraint, Direction, Layout, Alignment},
-    widgets::{Block, Borders, Paragraph},
-    Frame, Terminal, text::Span, style::{Color, Modifier, Style},
-};
+use std::fmt::Display;
 
+// label for cell status and game result
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Status {
-    X,
+    // occupied / game winned by X 
+    X, 
+    // occupied / game winned by O
     O,
+    // not occupied / game in progress
     Null,
 }
 
+// make status print-able
 impl Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
@@ -24,44 +23,111 @@ impl Display for Status {
         })
     }
 }
+
+// app info
 pub struct App {
-    row: u8,
-    column: u8,
-    matrix: [[Status; 3]; 3],
-    winner: Status,
-    now_player: Status,
+    // chess board size
+    pub size: usize,
+    // cursor location
+    pub row: usize,
+    pub column: usize,
+    // chess board status
+    pub matrix: Vec<Vec<Status>>,
+    // winner of this game
+    pub winner: Status,
+    // next player
+    pub now_player: Status,
 }
 
 impl App {
-    fn up(&mut self){
-        match self.row {
-            0 => self.row = 2,
-            _ => self.row -= 1,
-        };
+    // cursor operation
+    pub fn up(&mut self){
+        if self.row  == 0{
+            self.row = self.size - 1;
+        }else{
+            self.row -= 1;
+        }
     }
     
-    fn down(&mut self){
-        match self.row {
-            2 => self.row = 0,
-            _ => self.row += 1,
-        };
+    pub fn down(&mut self){
+        if self.row  == self.size - 1{
+            self.row = 0;
+        }else{
+            self.row += 1;
+        }
     }
 
-    fn left(&mut self){
-        match self.column {
-            0 => self.column = 2,
-            _ => self.column -= 1,
-        };
+    pub fn left(&mut self){
+        if self.column  == 0{
+            self.column = self.size - 1;
+        }else{
+            self.column -= 1;
+        }
     }
 
-    fn right(&mut self){
-        match self.column {
-            2 => self.column = 0,
-            _ => self.column += 1,
-        };
+    pub fn right(&mut self){
+        if self.column  == self.size - 1{
+            self.column = 0;
+        }else{
+            self.column += 1;
+        }
     }
     
-    fn visit(&mut self){
+    // check if index is within the range
+    fn visit_cell(& self, i: usize, j: usize) -> Option<Status>{
+        if i < self.size && j < self.size{
+            return Some(self.matrix[i][j]);
+        }
+        None
+    }
+
+    // check if there is a 5-in-a-row for one cell
+    fn check_cell(& self, i: usize, j: usize) -> Status{
+        if i > 3 && self.visit_cell(i-4, j).is_some(){
+            if self.visit_cell(i-4, j).unwrap() == self.visit_cell(i-3, j).unwrap()
+                && self.visit_cell(i-3, j).unwrap() == self.visit_cell(i-2, j).unwrap() 
+                && self.visit_cell(i-2, j).unwrap() == self.visit_cell(i-1, j).unwrap() 
+                && self.visit_cell(i-1, j).unwrap() == self.visit_cell(i, j).unwrap() 
+                && self.visit_cell(i, j).unwrap() != Status::Null 
+                {
+                return self.visit_cell(i, j).unwrap();
+            }
+        }
+        if j > 3 && self.visit_cell(i,j-4).is_some(){
+            if self.visit_cell(i, j-4).unwrap() == self.visit_cell(i, j-3).unwrap()
+                && self.visit_cell(i, j-3).unwrap() == self.visit_cell(i, j-2).unwrap() 
+                && self.visit_cell(i, j-2).unwrap() == self.visit_cell(i, j-1).unwrap() 
+                && self.visit_cell(i, j-1).unwrap() == self.visit_cell(i, j).unwrap() 
+                && self.visit_cell(i, j).unwrap() != Status::Null 
+                {
+                return self.visit_cell(i, j).unwrap();
+            }
+        }
+        if i > 3 && j > 3 && self.visit_cell(i-4, j-4).is_some(){
+            if self.visit_cell(i-4, j-4).unwrap() == self.visit_cell(i-3, j-3).unwrap()
+                && self.visit_cell(i-3, j-3).unwrap() == self.visit_cell(i-2, j-2).unwrap() 
+                && self.visit_cell(i-2, j-2).unwrap() == self.visit_cell(i-1, j-1).unwrap() 
+                && self.visit_cell(i-1, j-1).unwrap() == self.visit_cell(i, j).unwrap() 
+                && self.visit_cell(i, j).unwrap() != Status::Null 
+                {
+                return self.visit_cell(i, j).unwrap();
+            }
+        }
+        if j > 3 && self.visit_cell(i+4, j-4).is_some(){
+            if self.visit_cell(i+4, j-4).unwrap() == self.visit_cell(i+3, j-3).unwrap()
+                && self.visit_cell(i+3, j-3).unwrap() == self.visit_cell(i+2, j-2).unwrap() 
+                && self.visit_cell(i+2, j-2).unwrap() == self.visit_cell(i+1, j-1).unwrap() 
+                && self.visit_cell(i+1, j-1).unwrap() == self.visit_cell(i, j).unwrap() 
+                && self.visit_cell(i, j).unwrap() != Status::Null 
+                {
+                return self.visit_cell(i, j).unwrap();
+            }
+        }
+        Status::Null
+    }
+    
+    // put down a chess to occupy a vacant cell
+    pub fn register(&mut self){
         if let Status::Null = self.matrix[self.row as usize][self.column as usize]{
             match self.now_player{
                 Status::O => {
@@ -77,131 +143,33 @@ impl App {
         }
     }
 
-    fn check(&mut self){
-        for i in 0..3{
-            if self.matrix[i][0] == self.matrix[i][1] && self.matrix[i][1] == self.matrix[i][2] && self.matrix[i][0] != Status::Null{
-                self.winner = self.matrix[i][0];
-                self.now_player = Status::Null;
-                return ;
+    // check if this game ends
+    pub fn check(&mut self){
+        for i in 0..self.size{
+            for j in 0..self.size{
+                match self.check_cell(i, j) {
+                    Status::Null => continue,
+                    other => {
+                        self.winner = other;
+                        self.now_player = Status::Null;
+                        return ;
+                    },
+                }
             }
-            if self.matrix[0][i] == self.matrix[1][i] && self.matrix[1][i] == self.matrix[2][i] && self.matrix[0][i] != Status::Null{
-                self.winner = self.matrix[0][i];
-                self.now_player = Status::Null;
-                return ;
-            }
         }
-        if self.matrix[0][0] == self.matrix[1][1] && self.matrix[1][1] == self.matrix[2][2] && self.matrix[0][0] != Status::Null{
-            self.winner = self.matrix[0][0];
-            self.now_player = Status::Null;
-            return ;
-        }
-        if self.matrix[0][2] == self.matrix[1][1] && self.matrix[1][1] == self.matrix[2][0] && self.matrix[2][0] != Status::Null {
-            self.winner = self.matrix[1][1];
-            self.now_player = Status::Null;
-            return ;
-        }
+        
     }
+
+    // new app instance
     pub fn new() -> App{
+        let size = 10;
         App {
+            size: size,
             row: 0,
             column: 0,
-            matrix: [[Status::Null;3];3],
+            matrix: vec![vec![Status::Null; size];size],
             winner: Status::Null,
             now_player: Status::X,
         }
     }
-}
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-    //
-    let chunks = Layout::default() // 首先获取默认构造
-        .margin(1)
-        .constraints([
-                Constraint::Percentage(10),
-                Constraint::Percentage(30),
-                Constraint::Percentage(30),
-                Constraint::Percentage(30)
-            ].as_ref()) // 按照 3 行 和 最小 3 行的规则分割区域
-        .direction(Direction::Vertical) // 垂直分割
-        .split(f.size()); // 分割整块 Terminal 区域
-    let mut chunkss = Vec::new();
-    for i in 1..4{
-        chunkss.push(Layout::default()
-            .constraints([
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-                Constraint::Percentage(33)
-                ].as_ref())
-            .direction(Direction::Horizontal)
-            .split(chunks[i])
-        ); // 分割整块 Terminal 区域
-    }
-
-    for i in 0..3{
-        for j in 0..3{
-            let paragraph = Paragraph::new(
-                    match app.matrix[i][j] {
-                        Status::X => "X",
-                        Status::O => "O",
-                        Status::Null => " ",
-                    }
-                )
-                .style({
-                        let mut style = Style::default();
-                        if app.row == i as u8 && app.column == j as u8 {
-                            style = style.fg(Color::Red).add_modifier(Modifier::BOLD | Modifier::RAPID_BLINK | Modifier::REVERSED);
-                        }else{
-                            style = style.fg(Color::Black);
-                        }
-                        match app.matrix[i][j] {
-                            Status::X => style = style.bg(Color::Green),
-                            Status::O => style = style.bg(Color::LightYellow),
-                            Status::Null => style = style.bg(Color::DarkGray),
-                        }
-                        style
-                    }
-                )
-                .block(Block::default().borders(Borders::ALL).title(format!("{}-{}", i, j)))
-                .alignment(Alignment::Center);
-            f.render_widget(paragraph, chunkss[i][j]);
-        }
-    }
-
-    let paragraph = Paragraph::new(
-        match app.winner{
-            Status::Null => format!("# CHESS IN PROGRESS----{}'s Turn", app.now_player).to_string(),
-            Status::X => "X is the winner ~".to_string(),
-            Status::O => "O is the winner ~".to_string(),
-        }   
-        )
-        .style(Style::default().bg(Color::Black).fg(Color::White))
-        .block(Block::default().borders(Borders::ALL))
-        .alignment(Alignment::Center);
-    f.render_widget(paragraph, chunks[0]);
-
-}
-pub fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
-    loop {
-        app.check();
-        // 渲染 UI
-        terminal.draw(|f| ui(f, &mut app))?;
-        // 处理按键事件
-        if crossterm::event::poll(Duration::from_micros(1))? { // poll 方法非阻塞轮询
-            if let Event::Key(key) = event::read()? { // 直接 read 如果没有事件到来则会阻塞等待
-                match key.code { // 判断用户按键
-                    KeyCode::Char('q') => {
-                        break;
-                    },
-                    KeyCode::Char('r') => app = App::new(),
-                    KeyCode::Left => app.left(),
-                    KeyCode::Right => app.right(),
-                    KeyCode::Up => app.up(),
-                    KeyCode::Down => app.down(),
-                    KeyCode::Enter => app.visit(),
-                    _ => {},
-                }
-            }
-        }
-        // 处理其他逻辑
-    }
-    Ok(())
 }
